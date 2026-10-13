@@ -1,0 +1,39 @@
+{
+  "name": "backend_project",
+  "version": "1.0.0",
+  "description": "a full flash backend project with maximum complexity",
+  "keywords": [
+    "backend",
+    "complex",
+    "project"
+  ],
+  "license": "ISC",
+  "author": "Adnaan Hashmi",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "dev": "nodemon -r dotenv/config --experimental-json-modules src/index.js"
+  },
+  "devDependencies": {
+    "install": "^0.13.0",
+    "nodemon": "^3.1.14",
+    "npm": "^11.16.0",
+    "prettier": "^3.8.3"
+  },
+  "dependencies": {
+    "bcrypt": "6.0.0",
+    "cloudinary": "2.10.0",
+    "cloudinary-build-url": "^0.2.4",
+    "cookie-parser": "1.4.7",
+    "cors": "2.8.6",
+    "dotenv": "17.4.2",
+    "express": "5.2.1",
+    "jsonwebtoken": "9.0.3",
+    "mongoose": "9.7.4",
+    "mongoose-aggregate-paginate-v2": "1.1.4",
+    "multer": "2.2.0"
+  },
+  "allowScripts": {
+    "bcrypt@6.0.0": true
+  }
+}
