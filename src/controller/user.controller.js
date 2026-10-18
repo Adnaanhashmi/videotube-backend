@@ -24,7 +24,7 @@ try {
 }}
 
 const registerUser = asyncWrapper(async(req,res) => {
-  //get details from user comes from frontend { i am using postman }
+  //get details from user comes from frontend { here using postman }
   //applying validators for proper data
   //case handling if user is already exist
   //getting avator and coverimage from user using multer also appling checks that is on server
@@ -41,7 +41,7 @@ const registerUser = asyncWrapper(async(req,res) => {
     $or: [{username},{email}]
    })
    if (userExistence) {
-    throw new Errorstandards(401,"User Already exists")
+    throw new Errorstandards(400,"User Already exists")
   }
   // console.log(req.files);
   const avatarLocalPath = req.files?.avatar[0]?.path
@@ -60,12 +60,11 @@ const registerUser = asyncWrapper(async(req,res) => {
     email,
     password,
     avatar: avatarOnCloudinary.url,
-    coverimage: coverimageOnCloudinary.url ?? ""
+    coverimage: coverimageOnCloudinary?.url ?? ""
   })
   
-  console.log(userCreation);
+  // console.log(userCreation);
   
-
   const user = await User.findById(userCreation._id).select(
     "-password -refreshToken"
   )
@@ -97,7 +96,7 @@ const loginUser = asyncWrapper(async(req,res) => {
   const passwordValidate = await user.passwordValidate(password)
 
   if (!passwordValidate) {
-    throw new Errorstandards(410,"Password is incorrect");
+    throw new Errorstandards(401,"Password is incorrect");
    }
    
   const {UserAccessToken, UserRefreshToken} = await generateAccessAndRefreshToken(user._id)
@@ -157,23 +156,30 @@ const logoutUser = asyncWrapper(async(req,res) => {
 })
 
 const refreshAcressToken = asyncWrapper(async(req,res) => {
-  try {
     const refreshToken = req.cookies?.RefreshToken || req.body?.RefreshToken
+
     if (!refreshToken) {
-      throw new Errorstandards(401,"Un-Authorized Token");
+      throw new Errorstandards(400,"No refresh token received");
     }
-    const decodedTokenValue = jwt.verify(refreshToken,process.env.REFRESH_TOKEN_SECRET)
+
+    let decodedTokenValue;
+    try {
+      decodedTokenValue = jwt.verify(refreshToken,process.env.REFRESH_TOKEN_SECRET)
+    } catch (error) {
+      throw new Errorstandards(401,"Invalid refresh Token")
+    }
     
     const user = await User.findById(decodedTokenValue._id).select(
-      "-password -refreshToken"
+      "-password"
     )
   
     if (!user) {
       throw new Errorstandards(401,"User doesn't exists");
+    }
     
     if(refreshToken !== user?.refreshToken) 
      throw new Errorstandards(401,"Un-Authorized Token");
-    }
+
     const {UserAccessToken,UserRefreshToken} = await generateAccessAndRefreshToken(user._id)
   
     const options = {
@@ -194,15 +200,12 @@ const refreshAcressToken = asyncWrapper(async(req,res) => {
         200
       )
     )
-  } catch (error) {
-    throw new Errorstandards(401,"Un-Authorized Token");
-  }
 })
 
 const changePassword = asyncWrapper(async(req,res) => {
   const {oldPassword, newPassword, confirmPasssword} = req.body
    
-  if (!(oldPassword && 'newPassword' && confirmPasssword)) {
+  if (!(oldPassword && newPassword && confirmPasssword)) {
     throw new Errorstandards(400,"fill the required field");
   }
 
@@ -211,17 +214,12 @@ const changePassword = asyncWrapper(async(req,res) => {
   }
   const user = await User.findById(req.user?._id).select("-password -refreshToken")
 
-  const passwordValidationCheck = user.passwordValidate(oldPassword)
+  const passwordValidationCheck =  await user.passwordValidate(oldPassword)
 
   if (!passwordValidationCheck) {
     throw new Errorstandards(400,"Password is incorrect");
-    
   }
   
-  if (!user) {
-    throw new Errorstandards(401,"Invalid Credentials")
-  }
-
   user.password = newPassword
   await user.save({validateBeforeSave: false})
   return res
