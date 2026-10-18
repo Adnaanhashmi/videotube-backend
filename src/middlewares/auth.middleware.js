@@ -20,7 +20,8 @@ try {
      }
      req.user = user;
      next()
-} catch (error) {
+}
+catch (error) {
     throw new Errorstandards(401,"Tokens are invalid", error);
     
 }

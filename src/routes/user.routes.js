@@ -17,14 +17,14 @@ router.route("/register").post(
       }
     ]),
     registerUser)
+    
+    //secure routes
 router.route("/login").post(loginUser)
-  
-//secure routes
-router.route("/logout").post(VerifyJWT,logoutUser)
+router.route("/logout").post(VerifyJWT, logoutUser)
 router.route("/refresh-Token").post(refreshAcressToken)
 router.route("/change-password").patch(VerifyJWT, changePassword)
 router.route("/user-details").get(VerifyJWT, currentUser)
-router.route("/updateaccountdetails").patch(VerifyJWT,updateUserDetails)
+router.route("/updateaccountdetails").patch(VerifyJWT, updateUserDetails)
 router.route("/updateavatar").patch(VerifyJWT, upload.single("avatar"), updateAvatarImage)
 router.route("/updatecoverimage").patch(VerifyJWT, upload.single("coverimage"), updateCoverImage)
 router.route("/history").get(VerifyJWT, getWatchHistory)
