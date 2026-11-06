@@ -212,7 +212,7 @@ const changePassword = asyncWrapper(async(req,res) => {
   if (!(newPassword === confirmPasssword)) {
     throw new Errorstandards(400, "Confirm password does'not match");
   }
-  const user = await User.findById(req.user?._id).select("-password -refreshToken")
+  const user = await User.findById(req.user?._id).select("-refreshToken")
 
   const passwordValidationCheck =  await user.passwordValidate(oldPassword)
 
@@ -222,17 +222,26 @@ const changePassword = asyncWrapper(async(req,res) => {
   
   user.password = newPassword
   await user.save({validateBeforeSave: false})
+
   return res
   .status(200)
   .json(
-    new Apiresponse("Password is changed successfully", user, 200)
+    new Apiresponse("Password is changed successfully",
+      {
+      username: user.username,
+      fullName: user.fullName,
+      email: user.email,
+      avatar: user.avatar,
+      coverImage: user.coverImage
+    }
+    , 200)
   )
 })
 
 const currentUser = asyncWrapper(async(req,res) => {
   const userId = req.user?._id
 
-  const userExistence = User.findById(userId).select("-password -refreshToken")
+  const userExistence = await User.findById(userId).select("-password -refreshToken")
 
   if (!userExistence) {
     throw new Errorstandards(400, "User doesnot exist");
@@ -241,7 +250,7 @@ const currentUser = asyncWrapper(async(req,res) => {
   return res
   .status(200)
   .json(
-    new Apiresponse("Current User", res.user, 201)
+    new Apiresponse("Current User", userExistence, 200)
   )
 })
 
@@ -280,34 +289,35 @@ const updateAvatarImage = asyncWrapper(async(req,res) => {
   }
 
   if (!avatarLocalPath) {
-    throw new Errorstandards(500,"Avatar Image failed to meet server"); 
+    throw new Errorstandards(400,"Avatar Image failed to meet server"); 
   }
 
   const avatar = await cloudinaryService(avatarLocalPath)
   const oldAvatarUrl = user.avatar
 
-  if (!avatar.url) {
+  if (!avatar?.url) {
     throw new Errorstandards(500, "Image failed to upload");
   }
 
   user.avatar = avatar.url
+
   await user.save({validateBeforeSave: false})
-
-  const avatarPublicId = extractPublicId(oldAvatarUrl)
-  
-  if (!avatarPublicId) {
-    throw new Errorstandards(400,"avatar public id is not available")
-  }
-
-  const deleteOldAvatar = await cloudinary.uploader.destroy(avatarPublicId).catch((err) => {
-    console.log("Image is failed to delete",err);
-  })
 
   res
   .status(200)
   .json(
     new Apiresponse("Avatar is updated successfully",{avatar: avatar.url},200)
   )
+  
+  if(!oldAvatarUrl){
+    throw new Errorstandards(200,"No old avatar url maybe because user have not set avatar before");
+  }
+
+  const avatarPublicId = extractPublicId(oldAvatarUrl)
+  
+  await cloudinary.uploader.destroy(avatarPublicId).catch((err) => {
+    throw new Errorstandards(500,"Old Avatar is failed to delete from cloudinary",err)
+  })
 })
 
 const updateCoverImage = asyncWrapper(async(req,res) => {
@@ -321,46 +331,47 @@ const updateCoverImage = asyncWrapper(async(req,res) => {
   }
 
   if (!coverimageLocalPath) {
-    throw new Errorstandards(500,"Avatar Image failed to meet server"); 
+    throw new Errorstandards(400,"Avatar Image failed to meet server"); 
   }
 
   const updatedCoverImage = await cloudinaryService(coverimageLocalPath)
   const oldCoverImage = user.coverimage
 
-  if (!updatedCoverImage.url) {
+  if (!updatedCoverImage?.url) {
     throw new Errorstandards(501, "Image failed to upload");
   }
 
   user.coverimage = updatedCoverImage.url
   await user.save({validateBeforeSave: false})
 
-  const coverImagePublicId = extractPublicId(oldCoverImage)
-
-  if (!coverImagePublicId) {
-    throw new Errorstandards(400,"Cover Image public id is not available"); 
-  }
-  await cloudinary.uploader.destroy(coverImagePublicId).catch((err) => {
-    console.log("cover image is failed to delete");
-  })
-
   res
   .status(200).
   json(
     new Apiresponse("Cover Image is Successfully updated",{coverimage: updateCoverImage.url},200)
   )
+
+  if (!oldCoverImage) {
+    throw new Errorstandards(200,"No old coverimage url maybe because user have not set avatar before");
+  }
+
+  const coverImagePublicId = extractPublicId(oldCoverImage)
+
+  await cloudinary.uploader.destroy(coverImagePublicId).catch((err) => {
+    throw new Errorstandards(500,"Old coverimage is failed to delete from cloudinary",err)
+  })
 })
 
 const getUserProfileChannel = asyncWrapper(async(req,res) => {
   const{ username } = req.params
   
   if (!username?.trim()) {
-    throw new Errorstandards(400, "User doesn't exists");
+    throw new Errorstandards(400, "No username provided");
   }
-
+  
   const channelDetails = await User.aggregate([
     {
       $match: {
-        username: username?.toLowerCase
+        username: username?.toLowerCase()
       }
     },
     {
@@ -369,7 +380,9 @@ const getUserProfileChannel = asyncWrapper(async(req,res) => {
         localField: "_id",
         foreignField: "channel",
         as: "subscribers"
-      },
+      }
+    },
+    {
       $lookup: {
         from: "subscriptions",
         localField: "_id",
@@ -389,7 +402,7 @@ const getUserProfileChannel = asyncWrapper(async(req,res) => {
         issubscribed: {
           $cond: {
             if: {
-              $in: [req.user?._id, "subscribers"]
+              $in: [req.user?._id, "$subscribers"]
             },
             then: true,
             else: false
@@ -401,10 +414,14 @@ const getUserProfileChannel = asyncWrapper(async(req,res) => {
         username: 1,
         totalsubscribers: 1,
         subscribedto: 1,
-        issubscribed: 1
+        issubscribed: 1,
+        avatar: 1,
+        coverimage: 1,
+        fullName: 1
       }
     }
   ])
+
   if (!channelDetails.length) {
     throw new Errorstandards(404,"Page does not exists");
   }
@@ -419,12 +436,6 @@ const getUserProfileChannel = asyncWrapper(async(req,res) => {
 const getWatchHistory = asyncWrapper(async(req,res) => {
   const userId = req.user._id
 
-  const userExistOrNot = await User.findById(userId).select("-password -refreshToken")
-
-  if (!userExistOrNot) {
-    throw new Errorstandards(404,"User does not exist");
-    
-  }
   const userHistory = await User.aggregate([
       {
         $match: {
@@ -466,8 +477,9 @@ const getWatchHistory = asyncWrapper(async(req,res) => {
         }
       }
     ])
-    if (!userHistory) {
-      throw new Errorstandards("Failed to fetched watch history");
+
+    if (!userHistory.length) {
+      throw new Errorstandards("Failed to fetched watch history or there is no history yet");
     }
     return res
     .status(200)
