@@ -12,20 +12,29 @@ const videoUpload = asyncWrapper(async(req,res) => {
  const {title, description} = req.body
 
  if (!(title && description)) {
-        throw new Errorstandards(400,"Title is required");
+        throw new Errorstandards(400,"Title and description is required");
     }
   
  const videoLocalPath = req.files?.video[0]?.path
  const thumbnailLocalPath = req.files?.thumbnail[0]?.path
 
  if(!videoLocalPath) {
-        throw new Errorstandards(500,"Video is unable to meet server");
+        throw new Errorstandards(500,"Video is unable to reach server");
     }
+
  if(!thumbnailLocalPath){
-        throw new Errorstandards(500,"Pleasem upload the thumbnail first")
+        throw new Errorstandards(500,"Thumbnail is unable to reach server")
  }
  const video = await cloudinaryService(videoLocalPath)
  const thumbnail = await cloudinaryService(thumbnailLocalPath)
+
+ if (!video?.url) {
+    throw new Errorstandards(500,"video failed to upload on cloudinary");
+ }
+
+ if (!thumbnail?.url) {
+    throw new Errorstandards(500,"Thumbnail is failed to upload")
+ }
 
  const publishVideo = await Video.create({
     title,
@@ -38,7 +47,7 @@ const videoUpload = asyncWrapper(async(req,res) => {
     views: 0
  })
   
- const publishedVideo = Video.findById(publishVideo._id).populate("owner")
+ const publishedVideo = await Video.findById(publishVideo._id).populate("owner","username fullName avatar")
 
  if (!publishedVideo) {
     throw new Errorstandards(500,"video failed to upload");
@@ -49,9 +58,8 @@ const videoUpload = asyncWrapper(async(req,res) => {
  .json(
    new Apiresponse(
       "Video is uploaded successfully",
-      createdVideo,
-      200,
-      1
+      publishedVideo,
+      200
    )
  )
 })
@@ -61,19 +69,20 @@ const getVideo = asyncWrapper(async(req,res) => {
  const video = await Video.findById(videoId)
 
  if (!video) {
-      throw new Errorstandards(400,"video doesnot exist")
+      throw new Errorstandards(400,"video doesn't exist")
    }
 
- if(!video.ispublished && video.owner.toString() !== req.user?._id.toString()){
-   throw new Errorstandards(400,"Video is private");
+ const isOwner = req.user?._id.toString() === video.owner?._id.toString() ? true : false
+ 
+ if (!(isOwner || video.isPublished)) {
+   throw new Errorstandards(400,"Video is private")
  }
-   
+
  res.status(100).json(
       new Apiresponse(
          "Video is sent",
          video,
-         100,
-         1
+         100
       )
    )
 })

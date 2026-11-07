@@ -53,7 +53,10 @@ const registerUser = asyncWrapper(async(req,res) => {
   const avatarOnCloudinary = await cloudinaryService(avatarLocalPath)
   const coverimageOnCloudinary = await cloudinaryService(coverimageLocalPath)
   // console.log(avatarOnCloudinary);
-   
+  if (!avatarOnCloudinary?.url) {
+    throw new Errorstandards(500,"image failed to upload");
+  }
+ 
   const userCreation = await User.create({
     fullName,
     username,
