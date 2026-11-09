@@ -312,10 +312,6 @@ const updateAvatarImage = asyncWrapper(async(req,res) => {
     new Apiresponse("Avatar is updated successfully",{avatar: avatar.url},200)
   )
   
-  if(!oldAvatarUrl){
-    throw new Errorstandards(200,"No old avatar url maybe because user have not set avatar before");
-  }
-
   const avatarPublicId = extractPublicId(oldAvatarUrl)
   
   await cloudinary.uploader.destroy(avatarPublicId).catch((err) => {

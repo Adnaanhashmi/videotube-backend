@@ -66,7 +66,7 @@ const videoUpload = asyncWrapper(async(req,res) => {
 
 const getVideo = asyncWrapper(async(req,res) => {
  const videoId = req.params?.videoId
- const video = await Video.findById(videoId)
+ const video = await Video.findById(videoId).populate("owner","fullName username avatar coverimage")
 
  if (!video) {
       throw new Errorstandards(400,"video doesn't exist")
@@ -78,11 +78,15 @@ const getVideo = asyncWrapper(async(req,res) => {
    throw new Errorstandards(400,"Video is private")
  }
 
- res.status(100).json(
+ if(!isOwner){
+   await Video.updateOne({_id: videoId},{$inc : {views : 1}})
+ }
+
+ res.status(200).json(
       new Apiresponse(
          "Video is sent",
          video,
-         100
+         200
       )
    )
 })
@@ -108,9 +112,8 @@ const updateDetails = asyncWrapper(async(req,res) => {
       throw new Errorstandards(400,"Please provide Title or Description")
    }
 
- video.title = title || video.title
- video.description = description || video.description
- await video.save({validateBeforeSave: false})
+ video.title = title ?? video.title
+ video.description = description ?? video.description
 
  const oldVideoThumbnail = video.thumbnail
  let newThumbnailUrl;
@@ -118,18 +121,10 @@ const updateDetails = asyncWrapper(async(req,res) => {
  if(newThumbnail){
    const uploadNewThumbnail = await cloudinaryService(newThumbnail)
 
-   if(!uploadNewThumbnail.url){
-      throw new Errorstandards(500,"failed to upload image");
+   if(!uploadNewThumbnail?.url){
+      throw new Errorstandards(500,"failed to upload thumbnail");
    }
-
    newThumbnailUrl = uploadNewThumbnail.url
-   const oldThumbnailPublicId = extractPublicId(oldVideoThumbnail)
-   
-   if(!oldThumbnailPublicId){
-      console.log("Old thumbnail is failed to delete");
-   }else{
-   await cloudinary.uploader.destroy(oldThumbnailPublicId)
-   }
 }
 
  video.thumbnail = newThumbnailUrl ?? video.thumbnail
@@ -143,6 +138,12 @@ const updateDetails = asyncWrapper(async(req,res) => {
       ,video
       ,200)
  )
+
+  const oldThumbnailPublicId = extractPublicId(oldVideoThumbnail)
+
+  await cloudinary.uploader.destory(oldThumbnailPublicId).catch(() => {
+    console.log("Old video thumbnail is failed to delete")
+  })
 })
 
 const deleteVideo = asyncWrapper(async(req,res) => {
@@ -161,15 +162,13 @@ const deleteVideo = asyncWrapper(async(req,res) => {
  const thumbnailPublicId = extractPublicId(video.thumbnail)
  const videoPublicId = extractPublicId(video.videofile)
 
- if (!(thumbnailPublicId && videoPublicId)) {
-   throw new Errorstandards(500,"video or thumbnail public id is invalid");
- }
+ await cloudinary.api.delete_resources([videoPublicId,thumbnailPublicId]).catch((error) => {
+  throw new Errorstandards(500,"video is failed to delete",error);
+ })
 
- await cloudinary.api.delete_resources([videoPublicId,thumbnailPublicId])
+ const deleteVideoInDatabase = await Video.deleteOne({videoId})
 
- const deleteVideoInDatabase = await Video.findByIdAndDelete(video._id)
-
- if(!deleteVideoInDatabase){
+ if(deleteVideoInDatabase.deletedCount !== 1){
    throw new Errorstandards(500,"Video is failed to delete")
  }
  
@@ -183,13 +182,13 @@ const deleteVideo = asyncWrapper(async(req,res) => {
 const togglePublishStatus = asyncWrapper(async(req,res) => {
  const videoId = req.params?.videoId
 
- const video = await Video.findById(videoId)
+ const video = await Video.findById(videoId).populate("owner","username fullName avatar")
 
  if(!video){
    throw new Errorstandards(404,"video does not exist")
  }
 
- if (video.owner.toString() !== req.user?._id.toString()) {
+ if (video.owner?._id.toString() !== req.user?._id.toString()) {
    throw new Errorstandards(400,"Only owner is able to change the publish status");
  }
  
@@ -206,3 +205,11 @@ const togglePublishStatus = asyncWrapper(async(req,res) => {
    )
  )
 })
+
+export {
+  videoUpload,
+  getVideo,
+  updateDetails,
+  deleteVideo,
+  togglePublishStatus
+}
