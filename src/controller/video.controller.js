@@ -7,6 +7,7 @@ import cloudinaryService, { cloudinary } from "../services/cloudinary.services.j
 import Apiresponse from "../utils/apiResponse.js";
 import mongoose, { Collection } from "mongoose";
 import { extractPublicId } from "cloudinary-build-url";
+import { isObjectIdOrHexString } from "mongoose";
 
 const videoUpload = asyncWrapper(async(req,res) => {
  const {title, description} = req.body
@@ -66,6 +67,11 @@ const videoUpload = asyncWrapper(async(req,res) => {
 
 const getVideo = asyncWrapper(async(req,res) => {
  const videoId = req.params?.videoId
+
+ if (!isObjectIdOrHexString(videoId)) {
+  throw new Errorstandards(400," can't get video because video id is invalid")
+ }
+
  const video = await Video.findById(videoId).populate("owner","fullName username avatar coverimage")
 
  if (!video) {
@@ -97,6 +103,10 @@ const updateDetails = asyncWrapper(async(req,res) => {
  const videoId = req.params?.videoId
  const {title, description} = req.body
  const newThumbnail = req.file?.thumbnail[0]?.path
+
+ if (!isObjectIdOrHexString(videoId)) {
+    throw new Errorstandards(400,"can't update details because video id is invalid");
+ }
  
  const video = await Video.findById(videoId)
 
@@ -150,6 +160,10 @@ const deleteVideo = asyncWrapper(async(req,res) => {
  const userId = req.user._id
  const videoId = req.params?.videoId
 
+ if (!isObjectIdOrHexString(videoId)) {
+  throw new Errorstandards(400,"can't delete video because of invalid video id");
+ }
+
  const video = await Video.findById(videoId)
 
  if (!video) {
@@ -166,7 +180,7 @@ const deleteVideo = asyncWrapper(async(req,res) => {
   throw new Errorstandards(500,"video is failed to delete",error);
  })
 
- const deleteVideoInDatabase = await Video.deleteOne({videoId})
+ const deleteVideoInDatabase = await Video.deleteOne({_id: videoId})
 
  if(deleteVideoInDatabase.deletedCount !== 1){
    throw new Errorstandards(500,"Video is failed to delete")
@@ -181,6 +195,10 @@ const deleteVideo = asyncWrapper(async(req,res) => {
 
 const togglePublishStatus = asyncWrapper(async(req,res) => {
  const videoId = req.params?.videoId
+
+ if (!isObjectIdOrHexString(videoId)) {
+  throw new Errorstandards(400,"You can't decide publish status because video id is invalid");
+ }
 
  const video = await Video.findById(videoId).populate("owner","username fullName avatar")
 

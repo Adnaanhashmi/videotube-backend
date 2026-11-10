@@ -346,7 +346,7 @@ const updateCoverImage = asyncWrapper(async(req,res) => {
   res
   .status(200).
   json(
-    new Apiresponse("Cover Image is Successfully updated",{coverimage: updateCoverImage.url},200)
+    new Apiresponse("Cover Image is Successfully updated",{coverimage: updatedCoverImage.url},200)
   )
 
   if (!oldCoverImage) {
@@ -361,7 +361,7 @@ const updateCoverImage = asyncWrapper(async(req,res) => {
 })
 
 const getUserProfileChannel = asyncWrapper(async(req,res) => {
-  const{ username } = req.params
+  const { username } = req.params
   
   if (!username?.trim()) {
     throw new Errorstandards(400, "No username provided");
@@ -446,7 +446,7 @@ const getWatchHistory = asyncWrapper(async(req,res) => {
           from: "videos",
           localField: "watchHistory",
           foreignField: "_id",
-          as: "watchhistory",
+          as: "watchHistory",
           pipeline: [
             {
               $lookup: {
