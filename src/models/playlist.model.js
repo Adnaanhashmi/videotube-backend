@@ -4,20 +4,20 @@ import mongooseAggregatePaginate from "mongoose-aggregate-paginate-v2";
 const playlistSchema = new mongoose.Schema({
     name: {
         type: String,
-        require: true
+        required: true
     },
     description: {
-        typeof: String,
+        type: String,
         max: 30
     },
     videos: [
         {
-        typeof: mongoose.Schema.Types.ObjectId,
+        type: mongoose.Schema.Types.ObjectId,
         ref: "Video"
         }
     ],
     owner: {
-        typeof: mongoose.Schema.Types.ObjectId,
+        type: mongoose.Schema.Types.ObjectId,
         ref: "User"
     }
 },

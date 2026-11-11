@@ -2,11 +2,11 @@ import mongoose from "mongoose";
 
 const tweetSchema = new mongoose.Schema({
     owner: {
-        typeof: mongoose.Schema.Types.ObjectId,
+        type: mongoose.Schema.Types.ObjectId,
         ref: "User"
     },
     content: {
-        typeof: String,
+        type: String,
         required: true,
         min: 1,
         max: [70,"maximum limit is 70 characters"]
