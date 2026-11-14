@@ -224,10 +224,166 @@ const togglePublishStatus = asyncWrapper(async(req,res) => {
  )
 })
 
+const getAllVideos = asyncWrapper(async(req,res) => {
+ const {page,limit} = req.query
+
+ if (!(Number(page) && Number(limit))) {
+  throw new Errorstandards(400,"Page number or limit is invalid");
+ }
+ 
+ const customlabels = {
+  totalDocs: "totalVideos",
+  docs: "Videos"
+ }
+ 
+ const options = {
+   page: Number(page) || 1,
+   limit: Number(limit) <= 10 ? Number(limit) : 10,
+   customLabels: customlabels
+ }
+
+ const videosPipeline = Video.aggregate([
+  {
+    $match:{
+      isPublished: true
+    }
+  },
+  {
+    $sort: {
+      createdAt: -1
+    }
+  },
+  "__PREPAGINATE__",
+  {
+    $lookup: {
+      from: "users",
+      localField: "owner",
+      foreignField: "_id",
+      as: "owner",
+      pipeline: [
+        {
+          $project: {
+            fullName: 1,
+            username: 1,
+            avatar: 1
+          }
+        }
+      ]
+    }
+  },
+  {
+    $addFields: {
+      owner: {
+        $first: "$owner"
+      }
+    }
+  }
+
+ ])
+
+ const videos = await Video.aggregatePaginate(videosPipeline,options)
+ 
+ if (!videos.Videos.length) {
+    throw new Errorstandards(404,"No one uploaded video yet")
+ }
+ 
+ res.status(200).json(
+  new Apiresponse(
+    "10 videos loaded first",
+    videos,
+    200
+  )
+ )
+})
+
+const getAllChannelVideos = asyncWrapper(async(req,res) => {
+  const {username} = req.params
+  const {page,limit} = req.query
+
+  if (!username.trim()) {
+    throw new Errorstandards(400,"Can't retrieve username")
+  }
+  if (!(Number(page) && Number(limit))) {
+    throw new Errorstandards(400,"Invalid page and limit")
+  }
+
+  const user = await User.findOne({username})
+
+  if (!user) {
+    throw new Errorstandards(404,"user doesn't exist");
+  }
+
+  const customlabels = {
+    totalDocs: "totalVideos",
+    docs: "Videos",
+ }
+
+  const options = {
+    page: Number(page) || 1,
+    limit: Number(limit) <= 10 ? Number(limit) : 10,
+    customLabels: customlabels
+  }
+
+  const userVideosPipeline = Video.aggregate([
+    {
+      $match: {
+        owner: user._id,
+        isPublished: true
+      }
+    },
+    {
+      $sort: {
+        createdAt: -1
+      }
+    },
+    "__PREPAGINATE__",
+    {
+      $lookup: {
+        from: "users",
+        localField: "owner",
+        foreignField: "_id",
+        as: "owner",
+        pipeline: [
+          {
+            $project: {
+              fullName: 1,
+              username: 1,
+              avatar: 1
+            }
+          }
+        ]
+      }
+    },
+    {
+      $addFields: {
+        owner: {
+          $first: "$owner"
+        }
+      }
+    }
+  ])
+
+  const userVideos = await Video.aggregatePaginate(userVideosPipeline,options)
+
+  if (!userVideos.Videos.length) {
+    throw new Errorstandards(404,"User have not uploaded any video");
+  }
+
+  res.status(200).json(
+    new Apiresponse(
+      "User's all video sent",
+      userVideos,
+      200
+    )
+  )
+})
+
 export {
   videoUpload,
   getVideo,
   updateDetails,
   deleteVideo,
-  togglePublishStatus
+  togglePublishStatus,
+  getAllVideos,
+  getAllChannelVideos
 }
